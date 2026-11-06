@@ -25,27 +25,53 @@ jobs:
           java-version: '17'
 
       - name: Preparer Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Installer Android 35
+        shell: bash
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          set -e
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          java -version
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Installer Cordova
         run: npm install -g cordova@12
 
-      - name: Installer dependances
-        run: npm install
+      - name: Preparer projet HTML
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p /tmp/apk-source
+          cp -a . /tmp/apk-source/
+
+          rm -rf /tmp/apk-source/.git
+          rm -rf /tmp/apk-source/.github
+          rm -rf /tmp/apk-source/node_modules
+          rm -rf /tmp/apk-source/platforms
+          rm -rf /tmp/apk-source/plugins
+
+          cordova create /tmp/mon-apk \
+            com.absabefi.application \
+            MonApplication
+
+          rm -rf /tmp/mon-apk/www/*
+          cp -a /tmp/apk-source/. /tmp/mon-apk/www/
+
+          test -f /tmp/mon-apk/www/index.html
 
       - name: Ajouter Android
+        working-directory: /tmp/mon-apk
         run: cordova platform add android@14
 
       - name: Compiler APK
+        working-directory: /tmp/mon-apk
         run: cordova build android --debug
 
       - name: Sauvegarder APK
         uses: actions/upload-artifact@v4
         with:
           name: APK-Android
-          path: platforms/android/app/build/outputs/apk/debug/*.apk
+          path: /tmp/mon-apk/platforms/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
