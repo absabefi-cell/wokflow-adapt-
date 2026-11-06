@@ -28,12 +28,14 @@ jobs:
         shell: bash
         run: |
           set -e
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          java -version
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            --install \
             "platforms;android-35" \
-            "build-tools;35.0.0"
+            "build-tools;35.0.0" \
+            "platform-tools"
 
       - name: Installer Cordova
         run: npm install -g cordova@12
@@ -43,23 +45,70 @@ jobs:
         run: |
           set -e
 
-          mkdir -p /tmp/apk-source
-          cp -a . /tmp/apk-source/
-
-          rm -rf /tmp/apk-source/.git
-          rm -rf /tmp/apk-source/.github
-          rm -rf /tmp/apk-source/node_modules
-          rm -rf /tmp/apk-source/platforms
-          rm -rf /tmp/apk-source/plugins
-
           cordova create /tmp/mon-apk \
             com.absabefi.application \
             MonApplication
 
-          rm -rf /tmp/mon-apk/www/*
-          cp -a /tmp/apk-source/. /tmp/mon-apk/www/
+          rm -rf /tmp/mon-apk/www
+          mkdir -p /tmp/mon-apk/www
+
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='platforms' \
+            --exclude='plugins' \
+            --exclude='config.xml' \
+            --exclude='package.json' \
+            ./ /tmp/mon-apk/www/
 
           test -f /tmp/mon-apk/www/index.html
+
+      - name: Installer outil icones
+        run: npm install -g sharp-cli
+
+      - name: Configurer icone Android
+        shell: bash
+        run: |
+          set -e
+
+          ICON=""
+
+          for file in \
+            Horloge.png \
+            icon.png \
+            Icon.png \
+            logo.png
+          do
+            if [ -f "$GITHUB_WORKSPACE/$file" ]; then
+              ICON="$GITHUB_WORKSPACE/$file"
+              break
+            fi
+          done
+
+          if [ -n "$ICON" ]; then
+            echo "Icone trouvee: $ICON"
+
+            mkdir -p /tmp/mon-apk/res
+
+            sharp \
+              --input "$ICON" \
+              --output /tmp/mon-apk/res/icon.png \
+              resize 1024 1024
+
+            node - <<'NODE'
+          const fs = require('fs');
+          const path = '/tmp/mon-apk/config.xml';
+          let xml = fs.readFileSync(path, 'utf8');
+          xml = xml.replace(
+            '</widget>',
+            '    <icon src="res/icon.png" />\n</widget>'
+          );
+          fs.writeFileSync(path, xml);
+          NODE
+          else
+            echo "Aucune icone trouvee"
+          fi
 
       - name: Ajouter Android
         working-directory: /tmp/mon-apk
