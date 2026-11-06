@@ -47,7 +47,7 @@ jobs:
 
           cordova create /tmp/mon-apk \
             com.absabefi.application \
-            MonApplication
+            Horloge Maison
 
           rm -rf /tmp/mon-apk/www
           mkdir -p /tmp/mon-apk/www
