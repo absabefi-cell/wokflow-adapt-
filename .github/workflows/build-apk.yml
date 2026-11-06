@@ -1,0 +1,50 @@
+
+name: Generateur APK General
+
+on:
+  workflow_call:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Recuperer le projet
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparer Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Installer Android 35
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Installer Cordova
+        run: npm install -g cordova@12
+
+      - name: Installer dependances
+        run: npm install
+
+      - name: Ajouter Android
+        run: cordova platform add android@14
+
+      - name: Compiler APK
+        run: cordova build android --debug
+
+      - name: Sauvegarder APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: APK-Android
+          path: platforms/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
